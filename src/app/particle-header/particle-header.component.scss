@@ -1,0 +1,40 @@
+@mixin sm {
+    @media (max-width: ($screen-md-min - 1)) {
+      @content;
+      .sm-hide {
+        display: none;
+      }
+    }
+  }
+  .main-header {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+
+    &__heading {
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      
+      padding-top: 137px;
+      padding-bottom: 100px;
+  
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 38px;
+      letter-spacing: 1px;
+  
+
+      sm {
+        padding-bottom: 50px;
+      }
+  
+      margin: 0;
+    }
+  }
+ 
+//   canvas {
+//     background-color: #2e3a3f;
+//     position: absolute;
+//     z-index: -1;
+//   }

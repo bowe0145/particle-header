@@ -1,1 +1,18 @@
-/* You can add global styles to this file, and also import other style files */
+* {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 20px;
+    font-family: Roboto;
+    letter-spacing: normal;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #F5F6F8;
+    display: block;
+}
+
+html, body {
+    height: 100%;
+}
