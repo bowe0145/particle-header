@@ -1,6 +1,11 @@
 <div class="base-page">
   <main class="base-page__background-gradient">
-    <app-cool-header></app-cool-header>
+    <app-cool-header
+      [connectionRange]="150"
+      [connectionBaseWidth]="0.075"
+      [starCount]="100"
+      [starSpeed]="0.01"
+    ></app-cool-header>
   </main>
 </div>
 <router-outlet></router-outlet>

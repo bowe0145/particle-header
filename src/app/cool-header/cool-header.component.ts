@@ -4,6 +4,7 @@ import {
   ViewChild,
   Directive,
   Input,
+  HostListener,
 } from '@angular/core';
 
 @Directive({ selector: 'pane', standalone: true })
@@ -17,10 +18,7 @@ type Star = {
   radius: number;
   vx: number;
   vy: number;
-  connections: { index: number; distance: number }[];
 };
-
-type connection = number | undefined;
 
 // This requires a parent element
 @Component({
@@ -34,20 +32,22 @@ export class CoolHeaderComponent {
   // Set the default values for the stars
   @Input() starCount: number = 100;
   @Input() FPS: number = 60;
-  @Input() ConnectionFPS: number = 15;
   @Input() connectionRange: number = 45;
-  @Input() connectionBaseWidth: number = 0.05;
+  @Input() connectionBaseWidth: number = 0.005;
+  @Input() starSpeed: number = 0.05;
+
   // Connect to the canvas child component in this angular component
   @ViewChild('canvas') canvas!: ElementRef<HTMLCanvasElement>;
+
+  @HostListener('window:resize', ['$event']) onResize(event: any) {
+    this.resizeCanvas(event.target.innerWidth);
+  }
+
   private context!: CanvasRenderingContext2D;
   private lastWidth: number = 0;
   private lastHeight: number = 0;
 
   private stars: Star[] = [];
-  private connections: Map<number, number[]> = new Map();
-
-  private lastUpdateTime: number = 0;
-  private updateConnectionsInterval: number = 0;
 
   ngAfterViewInit() {
     if (!this.canvas) return;
@@ -57,18 +57,25 @@ export class CoolHeaderComponent {
       '2d'
     ) as CanvasRenderingContext2D;
 
-    this.updateConnectionsInterval = 1000 / this.ConnectionFPS;
-
     // Setup the canvas
     this.resizeCanvas();
+    this.stars = Array(this.starCount);
     this.setupStars();
 
     this.mainLoop();
   }
 
-  resizeCanvas(): void {
+  resizeCanvas(width?: number): void {
+    if (width) {
+      if (this.lastWidth === width) return;
+
+      this.context.canvas.width = width;
+      return;
+    }
+
     if (!this.canvas.nativeElement.parentElement) return;
     const parentWidth = this.canvas.nativeElement.parentElement.offsetWidth;
+    // We actually do care about the height, but only for like the first render
     const parentHeight = this.canvas.nativeElement.parentElement.offsetHeight;
 
     if (parentWidth === this.lastWidth && parentHeight === this.lastHeight)
@@ -89,7 +96,7 @@ export class CoolHeaderComponent {
 
     const aspectRatio = parentWidth / parentHeight;
 
-    const baseVelocity = 0.001;
+    const baseVelocity = this.starSpeed;
 
     let maxVelocityX = parentWidth * baseVelocity;
     let maxVelocityY = parentHeight * baseVelocity;
@@ -105,40 +112,24 @@ export class CoolHeaderComponent {
       const star: Star = {
         x: Math.random() * this.context.canvas.width,
         y: Math.random() * this.context.canvas.height,
-        radius: Math.random() * 1 + 1,
-        vx: Math.random() * 2 * maxVelocityX - maxVelocityX, // TODO: Base it off size of canvas
-        vy: Math.random() * 2 * maxVelocityY - maxVelocityY, // TODO: Base it off size of canvas
-        connections: [],
+        radius: Math.random() * 1.5 + 1.5,
+        vx: Math.random() * 2 * maxVelocityX - maxVelocityX,
+        vy: Math.random() * 2 * maxVelocityY - maxVelocityY,
       };
 
-      this.stars.push(star);
+      this.stars[i] = star;
     }
   }
 
-  mainLoop(time: number = 0) {
-    const deltaTime = time - this.lastUpdateTime;
+  mainLoop() {
     this.clearCanvas();
 
-    if (this.lastUpdateTime === 0) {
-      this.updateConnections();
-    }
-
-    if (deltaTime >= this.updateConnectionsInterval) {
-      this.lastUpdateTime = time - (deltaTime % this.updateConnectionsInterval);
-      this.updateConnections();
-    }
-
-    this.paintConnections();
-
-    // Loop through stars, paint and update
     for (let i = 0; i < this.stars.length; i++) {
-      const star = this.stars[i];
-
-      this.updateStar(star);
-      this.paintStar(star);
+      this.update(i);
+      this.paint(i);
     }
 
-    requestAnimationFrame((newTime) => this.mainLoop(newTime));
+    requestAnimationFrame(() => this.mainLoop());
   }
 
   getConnectionWidth(distance: number): number {
@@ -153,78 +144,46 @@ export class CoolHeaderComponent {
       this.context.canvas.height
     );
 
-    this.context.globalCompositeOperation = 'lighter';
-    this.context.globalAlpha = 0.2;
+    this.context.globalCompositeOperation = 'lighten';
+    this.context.globalAlpha = 0.3;
   }
 
-  calculateDistance(star1: Star, star2: Star) {
+  calculateDistance(star1: Star, star2: Star): number {
     const dx = star1.x - star2.x;
     const dy = star1.y - star2.y;
 
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  addRelationship(fromIndex: number, toIndex: number): void {
-    if (!this.connections.has(fromIndex)) {
-      this.connections.set(fromIndex, []);
-    }
-    let connections = this.connections.get(fromIndex)!;
-    if (!connections.includes(toIndex)) {
-      connections.push(toIndex);
-    }
-  }
-
-  removeRelationship(fromIndex: number, toIndex: number): void {
-    if (this.connections.has(fromIndex)) {
-      let connections = this.connections.get(fromIndex)!;
-      const index = connections.indexOf(toIndex);
-      if (index !== -1) {
-        connections.splice(index, 1);
-      }
-    }
-  }
-
-  updateConnections(): void {
-    for (let i = 0; i < this.stars.length; i++) {
-      for (let j = i + 1; j < this.stars.length; j++) {
-        const star1 = this.stars[i];
-        const star2 = this.stars[j];
-
-        const distance = this.calculateDistance(star1, star2);
-
-        if (distance < this.connectionRange) {
-          this.addRelationship(i, j);
-        } else {
-          // Check if there is a relationship and remove it
-          this.removeRelationship(i, j);
-        }
-      }
-    }
-  }
-
   drawLine(star1: Star, star2: Star, width: number, opacity?: number): void {
-    // this.context.strokeStyle = '#FFF';
     this.context.lineWidth = width;
     this.context.beginPath();
     this.context.moveTo(star1.x, star1.y);
     this.context.lineTo(star2.x, star2.y);
+    // Set the colour to be white with an opacity that fades out as the distance increases
     this.context.strokeStyle = `rgba(255, 255, 255, ${opacity}`;
     this.context.stroke();
   }
 
-  paintConnections(): void {
-    for (const [sourceIndex, targetIndices] of this.connections.entries()) {
-      const fromStar = this.stars[sourceIndex];
-      for (const targetIndex of targetIndices) {
-        const toStar = this.stars[targetIndex];
+  update(index: number): void {
+    this.updateStar(this.stars[index]);
+  }
 
-        const distance = this.calculateDistance(fromStar, toStar);
-        const opacity = Math.max(
-          1 - Math.pow(distance / this.connectionRange, 2),
-          0
-        );
+  paint(index: number): void {
+    // Paint the dot
+    this.paintStar(this.stars[index]);
 
-        this.drawLine(fromStar, toStar, 1, opacity); // Assuming a line width of 1
+    // Loop through the other stars (only the ones that haven't been connected yet)
+    // To prevent double connections
+    const star1 = this.stars[index];
+    for (let i = index + 1; i < this.stars.length; i++) {
+      const star2 = this.stars[i];
+
+      if (this.calculateDistance(star1, star2) < this.connectionRange) {
+        const distance = this.calculateDistance(star1, star2);
+        const width = this.getConnectionWidth(distance);
+        // Paint the connecting line
+        this.drawLine(star1, star2, width, 1);
       }
     }
   }
@@ -237,9 +196,11 @@ export class CoolHeaderComponent {
   }
 
   updateStar(star: Star): void {
+    // Move the star
     star.x += star.vx / this.FPS;
     star.y += star.vy / this.FPS;
 
+    // Check if it should bounce
     if (star.x < 0 || star.x > this.context.canvas.width) {
       star.vx = -star.vx;
     }
