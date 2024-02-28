@@ -2,15 +2,9 @@ import {
   Component,
   ElementRef,
   ViewChild,
-  Directive,
   Input,
   HostListener,
 } from '@angular/core';
-
-@Directive({ selector: 'pane', standalone: true })
-export class Pane {
-  @Input() id!: string;
-}
 
 type Star = {
   x: number;
@@ -62,7 +56,7 @@ export class CoolHeaderComponent {
     this.stars = Array(this.starCount);
     this.setupStars();
 
-    this.mainLoop();
+    requestAnimationFrame(() => this.mainLoop());
   }
 
   resizeCanvas(width?: number): void {
@@ -155,13 +149,12 @@ export class CoolHeaderComponent {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  drawLine(star1: Star, star2: Star, width: number, opacity?: number): void {
-    this.context.lineWidth = width;
+  drawLine(star1: Star, star2: Star, width: number): void {
     this.context.beginPath();
     this.context.moveTo(star1.x, star1.y);
     this.context.lineTo(star2.x, star2.y);
-    // Set the colour to be white with an opacity that fades out as the distance increases
-    this.context.strokeStyle = `rgba(255, 255, 255, ${opacity}`;
+    this.context.lineWidth = width;
+    this.context.strokeStyle = '#FFF';
     this.context.stroke();
   }
 
@@ -178,12 +171,11 @@ export class CoolHeaderComponent {
     const star1 = this.stars[index];
     for (let i = index + 1; i < this.stars.length; i++) {
       const star2 = this.stars[i];
-
-      if (this.calculateDistance(star1, star2) < this.connectionRange) {
-        const distance = this.calculateDistance(star1, star2);
+      const distance = this.calculateDistance(star1, star2);
+      if (distance < this.connectionRange) {
         const width = this.getConnectionWidth(distance);
         // Paint the connecting line
-        this.drawLine(star1, star2, width, 1);
+        this.drawLine(star1, star2, width);
       }
     }
   }
