@@ -22,12 +22,13 @@ type Star = {
 })
 export class StarParticlesComponent {
   @Input() starCount = 100;
-  @Input() FPS: number = 30;
+  @Input() FPS: number = 60;
   @Input() connectionRange: number = 100;
   @Input() connectionBaseWidth: number = 0.5;
-  @Input() starSpeed: number = 0.0001;
+  @Input() starSpeed: number = 0.00005;
   @Input() transparency: number = 0.3;
   @Input() starColour: string = '#FFF';
+  // TODO: Use this
   @Input() connectionColour: string = '#FFF';
 
   // Connect the canvas element to the component
@@ -44,6 +45,7 @@ export class StarParticlesComponent {
   private lastWidth: number = 0;
   private lastHeight: number = 0;
   private stars: Star[] = [];
+  private lastTime: number = 0;
 
   ngAfterViewInit() {
     // Require a canvas
@@ -66,7 +68,7 @@ export class StarParticlesComponent {
     this.instantiateStars();
 
     // Start the animation
-    requestAnimationFrame(() => this.animate());
+    requestAnimationFrame((newTime) => this.animate(newTime));
   }
 
   ngOnDestroy() {
@@ -178,12 +180,12 @@ export class StarParticlesComponent {
     this.context.globalAlpha = this.transparency;
   }
 
-  updateStar(star: Star): void {
+  updateStar(star: Star, deltaTime: number): void {
     if (!this.context) return;
 
     // Update the position
-    star.x += star.vx;
-    star.y += star.vy;
+    star.x += star.vx * deltaTime;
+    star.y += star.vy * deltaTime;
 
     // Bounce off the walls
     if (star.x < 0 || star.x > this.context.canvas.width) {
@@ -234,22 +236,27 @@ export class StarParticlesComponent {
     }
   }
 
-  animate(): void {
+  animate(time: number): void {
     if (!this.context) return;
     if (!this.canvas) return;
     if (!this.canvas.nativeElement.parentElement) return;
+
+    // Calculate the time delta
+    const deltaTime = time - this.lastTime;
+    // console.log('deltaTime', deltaTime);
+    this.lastTime = time;
 
     this.resizeCanvas();
     this.clearCanvas();
 
     for (let i = 0; i < this.stars.length; i++) {
       // Update the star: O(N)
-      this.updateStar(this.stars[i]);
+      this.updateStar(this.stars[i], deltaTime);
 
       // Draw the star: O(N^2)
       this.drawStar(i);
     }
 
-    requestAnimationFrame(() => this.animate());
+    requestAnimationFrame((newTime) => this.animate(newTime));
   }
 }
