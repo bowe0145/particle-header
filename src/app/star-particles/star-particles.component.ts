@@ -24,9 +24,9 @@ export class StarParticlesComponent {
   @Input() starCount = 100;
   @Input() FPS: number = 30;
   @Input() connectionRange: number = 100;
-  @Input() connectionBaseWidth: number = 0.005;
-  @Input() starSpeed: number = 0.005;
-  @Input() transparency: number = 1;
+  @Input() connectionBaseWidth: number = 0.5;
+  @Input() starSpeed: number = 0.0001;
+  @Input() transparency: number = 0.3;
   @Input() starColour: string = '#FFF';
   @Input() connectionColour: string = '#FFF';
 
@@ -87,8 +87,6 @@ export class StarParticlesComponent {
   }
 
   resizeCanvas(width?: number): void {
-    console.log("Resize canvas");
-    console.log("Width is", this.canvas?.nativeElement.parentElement?.offsetHeight);
     if (width) {
       if (this.lastWidth === width) return;
       if (!this.context) return;
@@ -97,34 +95,38 @@ export class StarParticlesComponent {
       return;
     }
 
+    // Require a canvas and parent
     if (!this.canvas) return;
     if (!this.canvas.nativeElement.parentElement) return;
+
     const parentWidth = this.canvas.nativeElement.parentElement.offsetWidth;
     // We actually do care about the height, but only for like the first render
     const parentHeight = this.canvas.nativeElement.parentElement.offsetHeight;
 
+    // Skip the resize if the size is the same
     if (parentWidth === this.lastWidth && parentHeight === this.lastHeight)
       return;
 
+    // Require a context
     if (!this.context) return;
-    this.context.canvas.width = parentWidth;
-    // this.context.canvas.width = 500;
-    this.context.canvas.height = parentHeight;
-    // this.context.canvas.height = 500;
 
-    // this.lastWidth = 500;
+    // Update the canvas size to match the parent
+    this.context.canvas.width = parentWidth;
+    this.context.canvas.height = parentHeight;
+
+    // Update the last size so we can skip the resize if it's the same
     this.lastWidth = parentWidth;
-    // this.lastHeight = 500;
     this.lastHeight = parentHeight;
   }
 
-  instantiateStars(): void {
-    if (!this.canvas) return;
-    if (!this.canvas.nativeElement.parentElement) return;
-    if (!this.context) return;
+  calculateMaxVelocity(): { maxVelocityX: number; maxVelocityY: number } {
+    if (!this.canvas) return { maxVelocityX: 0, maxVelocityY: 0 };
+    if (!this.canvas.nativeElement.parentElement)
+      return { maxVelocityX: 0, maxVelocityY: 0 };
 
     const parentWidth = this.canvas.nativeElement.parentElement.offsetWidth;
     const parentHeight = this.canvas.nativeElement.parentElement.offsetHeight;
+
     const aspectRatio = parentWidth / parentHeight;
     const baseVelocity = this.starSpeed;
 
@@ -137,6 +139,16 @@ export class StarParticlesComponent {
     } else {
       maxVelocityX /= aspectRatio;
     }
+
+    return { maxVelocityX, maxVelocityY };
+  }
+
+  instantiateStars(): void {
+    if (!this.canvas) return;
+    if (!this.canvas.nativeElement.parentElement) return;
+    if (!this.context) return;
+
+    const { maxVelocityX, maxVelocityY } = this.calculateMaxVelocity();
 
     // This could use array.push for slight performance improvement
     for (let i = 0; i < this.starCount; i++) {
@@ -155,7 +167,12 @@ export class StarParticlesComponent {
   clearCanvas(): void {
     if (!this.context) return;
 
-    this.context.clearRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+    this.context.clearRect(
+      0,
+      0,
+      this.context.canvas.width,
+      this.context.canvas.height
+    );
 
     this.context.globalCompositeOperation = 'lighten';
     this.context.globalAlpha = this.transparency;
@@ -177,6 +194,13 @@ export class StarParticlesComponent {
     }
   }
 
+  calculateDistance(star1: Star, star2: Star): number {
+    const dx = star1.x - star2.x;
+    const dy = star1.y - star2.y;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   drawStar(index: number): void {
     if (!this.context) return;
 
@@ -192,19 +216,20 @@ export class StarParticlesComponent {
     // Connect the stars
     for (let j = index + 1; j < this.stars.length; j++) {
       const star2 = this.stars[j];
-      const distance = Math.sqrt(
-        (star1.x - star2.x) ** 2 + (star1.y - star2.y) ** 2
-      );
-      // console.log(distance);
+      const distance = this.calculateDistance(star1, star2);
 
       if (distance < this.connectionRange) {
         this.context.beginPath();
         this.context.moveTo(star1.x, star1.y);
+        const width =
+          this.connectionBaseWidth + (1 - distance / this.connectionRange) * 1;
+        const opacity = 1 - distance / this.connectionRange;
+        this.context.lineWidth = width;
+        this.context.lineTo(star1.x, star1.y);
+        this.context.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+        // this.context.strokeStyle = '#FFF';
         this.context.lineTo(star2.x, star2.y);
-        this.context.strokeStyle = this.connectionColour;
-        this.context.lineWidth = this.connectionBaseWidth * (1 - distance / this.connectionRange) * 1;
         this.context.stroke();
-        this.context.closePath();
       }
     }
   }
