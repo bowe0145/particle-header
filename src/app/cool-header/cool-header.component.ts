@@ -1,9 +1,9 @@
 import {
   Component,
   ElementRef,
-  ViewChild,
-  Input,
   HostListener,
+  Input,
+  ViewChild,
 } from '@angular/core';
 
 type Star = {
@@ -25,10 +25,11 @@ type Star = {
 export class CoolHeaderComponent {
   // Set the default values for the stars
   @Input() starCount: number = 100;
-  @Input() FPS: number = 60;
-  @Input() connectionRange: number = 45;
+  @Input() FPS: number = 15;
+  @Input() connectionRange: number = 120;
   @Input() connectionBaseWidth: number = 0.005;
   @Input() starSpeed: number = 0.05;
+  @Input() transparency: number = 0.3;
 
   // Connect to the canvas child component in this angular component
   @ViewChild('canvas') canvas!: ElementRef<HTMLCanvasElement>;
@@ -40,8 +41,15 @@ export class CoolHeaderComponent {
   private context!: CanvasRenderingContext2D;
   private lastWidth: number = 0;
   private lastHeight: number = 0;
+  private lastTime: number = 0;
+  private timeSinceLastPop: number = 0;
+  private desiredTransparency: number = 0;
+  private frameCount: number = 0;
+  private wantToRemove: number[] = [];
 
   private stars: Star[] = [];
+
+
 
   ngAfterViewInit() {
     if (!this.canvas) return;
@@ -55,8 +63,27 @@ export class CoolHeaderComponent {
     this.resizeCanvas();
     this.stars = Array(this.starCount);
     this.setupStars();
+    console.log(this.stars[0])
 
-    requestAnimationFrame(() => this.mainLoop());
+    setTimeout(() => {
+      console.log("Fading in", this.lastTime)
+      this.fadeIn();
+    }, 1000);
+
+    requestAnimationFrame((newTime) => this.mainLoop(newTime));
+  }
+
+  fadeIn() {
+    const timeToFadeIn = 5;
+    if (this.desiredTransparency < 1) {
+      this.desiredTransparency += 1 / timeToFadeIn;
+
+      setTimeout(() => {
+        this.fadeIn();
+      }, 100);
+    } else {
+      console.log("Done fading in", this.lastTime)
+    }
   }
 
   resizeCanvas(width?: number): void {
@@ -115,15 +142,85 @@ export class CoolHeaderComponent {
     }
   }
 
-  mainLoop() {
+  mainLoop(time: number = 0): void {
+    // console.log("Mainloop");
+    if (time === 0) {
+      console.log("time is 0")
+      this.lastTime = performance.now();
+      requestAnimationFrame((newTime) => this.mainLoop(newTime));
+      return;
+    }
+
+    // Calculate the time passed
+    const elapsed = time - this.lastTime;
+    this.lastTime = time;
+
+    if (this.desiredTransparency < 1) {
+      this.frameCount++;
+    }
+
+    if (elapsed > 1000 / this.FPS && this.frameCount > 5 && this.desiredTransparency <= 0.3) {
+      this.timeSinceLastPop += elapsed;
+
+      const shouldPop = (elapsed / (1000 / this.FPS) | 0);
+      this.wantToRemove.push(shouldPop);
+
+      // console.log("After", this.stars.length)
+    }
+
+    const avgRemove = this.wantToRemove.reduce((a, b) => a + b, 0) / this.wantToRemove.length | 0;
+    const maxRemove = Math.max(...this.wantToRemove);
+    if (maxRemove > 0 && this.desiredTransparency >= 0.3 && this.desiredTransparency <= 0.5) {
+      console.log("avgRemove", avgRemove, "maxRemove", maxRemove)
+      console.log(this.wantToRemove.length)
+      for (let i = 0; i < avgRemove; i++) {
+        this.stars.pop();
+      }
+
+      this.wantToRemove = [];
+      console.log("After", this.stars.length)
+    }
     this.clearCanvas();
 
     for (let i = 0; i < this.stars.length; i++) {
-      this.update(i);
+      this.update(i, elapsed);
       this.paint(i);
     }
 
-    requestAnimationFrame(() => this.mainLoop());
+    // console.log("Elapsed", elapsed);
+
+    // Run the main loop only if the time passed is bigger than the FPS
+    // if (elapsed > 1000 / this.FPS) {
+    //   // console.log("Looping");
+    //   this.lastTime = time;
+    //   this.clearCanvas();
+
+    //   for (let i = 0; i < this.stars.length; i++) {
+    //     this.update(i, elapsed);
+    //     this.paint(i);
+    //   }
+    // }
+
+    requestAnimationFrame((newTime) => this.mainLoop(newTime));
+
+    // if (this.counter > 5) {
+    //   console.log("FPS", 1000 / delta)
+    //   console.log("time", time);
+    //   console.log("lastTime", this.lastTime);
+    //   console.log("delta", delta);
+    //   console.log("this.fps", this.FPS);
+    //   debugger;
+    // }
+    // this.lastTime = time;
+    // // console.log(delta);
+    // this.clearCanvas();
+
+    // for (let i = 0; i < this.stars.length; i++) {
+    //   this.update(i, elapsed);
+    //   this.paint(i);
+    // }
+
+    // requestAnimationFrame((newTime) => this.mainLoop(newTime));
   }
 
   getConnectionWidth(distance: number): number {
@@ -154,12 +251,12 @@ export class CoolHeaderComponent {
     this.context.moveTo(star1.x, star1.y);
     this.context.lineTo(star2.x, star2.y);
     this.context.lineWidth = width;
-    this.context.strokeStyle = '#FFF';
+    this.context.strokeStyle = `rgba(255, 255, 255, ${this.desiredTransparency})`;
     this.context.stroke();
   }
 
-  update(index: number): void {
-    this.updateStar(this.stars[index]);
+  update(index: number, delta: number): void {
+    this.updateStar(this.stars[index], delta);
   }
 
   paint(index: number): void {
@@ -181,16 +278,23 @@ export class CoolHeaderComponent {
   }
 
   paintStar(star: Star): void {
-    this.context.fillStyle = '#ccc';
+    this.context.fillStyle = `rgba(255, 255, 255, ${this.desiredTransparency})`;
     this.context.beginPath();
     this.context.arc(star.x, star.y, star.radius, 0, 2 * Math.PI);
     this.context.fill();
   }
 
-  updateStar(star: Star): void {
-    // Move the star
+  updateStar(star: Star, delta: number): void {
+    // if (!delta) return;
+    // Move the star based on its velocity and the time passed
+    // star.x += star.vx / (delta / 1000);
+    // star.y += star.vy / (delta / 1000);
     star.x += star.vx / this.FPS;
     star.y += star.vy / this.FPS;
+    // console.log("I want to move", star.x, star.vx, this.FPS, star.vx / this.FPS)
+    // console.log("Using FPS", star.x, star.vx, delta, star.vx / (1000 / delta))
+
+    // debugger;
 
     // Check if it should bounce
     if (star.x < 0 || star.x > this.context.canvas.width) {

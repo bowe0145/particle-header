@@ -1,0 +1,16 @@
+.base-page {
+  position: relative;
+  // background-color: #ccc;
+  &__particles {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+      &__background {
+        z-index: -1;
+        position: absolute;
+        width: 100%;
+        background-image: linear-gradient(180deg, #001771 0%, #14004C 100%);
+    }
+}

@@ -1,12 +1,8 @@
 <div class="base-page">
-  <main class="base-page__background-gradient">
-    <app-cool-header
-      [connectionRange]="150"
-      [connectionBaseWidth]="0.075"
-      [starSpeed]="0.01"
-    >
-    <h1 class="main-header__heading">Implementation Characteristics</h1>
-  </app-cool-header>
-  </main>
+  <app-base-page
+    [showParticles]="showParticles"
+    [hideBackground]="hideBackground"
+  >
+    <h1 class="main-header__heading">Base Page Text</h1>
+  </app-base-page>
 </div>
-<router-outlet></router-outlet>

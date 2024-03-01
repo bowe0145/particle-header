@@ -1,12 +1,17 @@
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
+
+import { CommonModule } from '@angular/common';
+import { StarParticlesComponent } from '../star-particles/star-particles.component';
 
 @Component({
   selector: 'app-base-page',
-  standalone: true,
-  imports: [],
   templateUrl: './base-page.component.html',
-  styleUrl: './base-page.component.scss'
+  standalone: true,
+  imports: [StarParticlesComponent, CommonModule],
+  styleUrls: ['./base-page.component.scss']
 })
 export class BasePageComponent {
-
+  @Input() height: number = 333;
+  @Input() hideBackground: boolean = false;
+  @Input() showParticles: boolean = false;
 }
