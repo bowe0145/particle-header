@@ -23,13 +23,23 @@ type Star = {
 export class StarParticlesComponent {
   @Input() starCount = 100;
   @Input() FPS: number = 60;
-  @Input() connectionRange: number = 100;
+  @Input() connectionRange: number = 130;
   @Input() connectionBaseWidth: number = 0.5;
   @Input() starSpeed: number = 0.00005;
   @Input() transparency: number = 0.3;
   @Input() starColour: string = '#FFF';
   // TODO: Use this
   @Input() connectionColour: string = '#FFF';
+
+
+  /*
+  Ideally we would want to use the following:
+    320 x 355 = 2270 per dot, range 75
+    425 x 355 = 2514 per dot, range 75
+    768 x 318 = 3488 per dot, range 90
+    1024 x 318 = 3618 per dot, range 100
+    1440 x 318 = 4828 per dot, range 130
+  */
 
   // Connect the canvas element to the component
   @ViewChild('canvas') canvas: ElementRef<HTMLCanvasElement> | null = null;
