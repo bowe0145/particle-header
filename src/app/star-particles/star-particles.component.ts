@@ -21,25 +21,17 @@ type Star = {
   styleUrls: ['./star-particles.component.scss'],
 })
 export class StarParticlesComponent {
-  @Input() starCount = 100;
+  // This is essentially 100 = 100%
+  @Input() starDensity = 100;
   @Input() FPS: number = 60;
-  @Input() connectionRange: number = 130;
+  // This is also a percentage
+  @Input() connectionRange: number = 100;
   @Input() connectionBaseWidth: number = 0.5;
-  @Input() starSpeed: number = 0.00005;
+  @Input() starSpeed: number = 0.00002;
   @Input() transparency: number = 0.3;
   @Input() starColour: string = '#FFF';
   // TODO: Use this
   @Input() connectionColour: string = '#FFF';
-
-
-  /*
-  Ideally we would want to use the following:
-    320 x 355 = 2270 per dot, range 75
-    425 x 355 = 2514 per dot, range 75
-    768 x 318 = 3488 per dot, range 90
-    1024 x 318 = 3618 per dot, range 100
-    1440 x 318 = 4828 per dot, range 130
-  */
 
   // Connect the canvas element to the component
   @ViewChild('canvas') canvas: ElementRef<HTMLCanvasElement> | null = null;
@@ -56,6 +48,8 @@ export class StarParticlesComponent {
   private lastHeight: number = 0;
   private stars: Star[] = [];
   private lastTime: number = 0;
+  private adjustedStarCount: number = 0;
+  private adjustedStarRange: number = 0;
 
   ngAfterViewInit() {
     // Require a canvas
@@ -71,9 +65,6 @@ export class StarParticlesComponent {
     this.setupResizeObserver();
     this.resizeCanvas(); // This uses the container size
 
-    // We want to setup the size here because in the future we will
-    // Want to derive the count from the width/height + preferred density
-    this.stars = Array(this.starCount);
     // Create the stars
     this.instantiateStars();
 
@@ -155,15 +146,90 @@ export class StarParticlesComponent {
     return { maxVelocityX, maxVelocityY };
   }
 
+  // Linear Interpolation
+  interpolate(
+    x: number,
+    x0: number,
+    x1: number,
+    y0: number,
+    y1: number
+  ): number {
+    return y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
+  }
+
+  adjustStarSettings(
+    width: number,
+    height: number
+  ): { num: number; range: number } {
+    const area = width * height;
+
+    // The density and ranges are based on what looks ideal, for breakpoints in the css
+    // { screen area, pixels per star, range in pixels}
+    const dataPoints = [
+      { area: 320 * 355, density: 2270, range: 75 },
+      { area: 425 * 355, density: 2515, range: 75 },
+      { area: 768 * 355, density: 3490, range: 90 },
+      { area: 1024 * 318, density: 3618, range: 100 },
+      { area: 1450 * 318, density: 4828, range: 130 },
+    ];
+
+    // Sort data points by area to ensure correct interpolation order
+    dataPoints.sort((a, b) => a.area - b.area);
+
+    // Find the two points between which we'll interpolate
+    let lower = dataPoints[0];
+    let upper = dataPoints[dataPoints.length - 1];
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+      if (area >= dataPoints[i].area && area <= dataPoints[i + 1].area) {
+        lower = dataPoints[i];
+        upper = dataPoints[i + 1];
+        break;
+      }
+    }
+
+    // Interpolate density and range
+    const density = this.interpolate(
+      area,
+      lower.area,
+      upper.area,
+      lower.density,
+      upper.density
+    );
+    const range = this.interpolate(
+      area,
+      lower.area,
+      upper.area,
+      lower.range,
+      upper.range
+    );
+
+    // Calculate number of stars based on interpolated density
+    const numberOfStars = Math.round(area / density) * (this.starDensity / 100);
+    const rangeOfStars = Math.round((range * this.connectionRange) / 100);
+
+    return { num: numberOfStars, range: rangeOfStars };
+  }
+
   instantiateStars(): void {
     if (!this.canvas) return;
     if (!this.canvas.nativeElement.parentElement) return;
     if (!this.context) return;
 
+    const parentWidth = this.canvas.nativeElement.parentElement.offsetWidth;
+    const parentHeight = this.canvas.nativeElement.parentElement.offsetHeight;
+
+    const { num, range } = this.adjustStarSettings(parentWidth, parentHeight);
+
+    this.adjustedStarCount = (num * this.starDensity) / 100;
+    this.adjustedStarRange = (range * this.connectionRange) / 100;
+
+    console.log('adjustedStarCount', this.adjustedStarCount);
+    console.log('adjustedStarRange', this.adjustedStarRange);
+
     const { maxVelocityX, maxVelocityY } = this.calculateMaxVelocity();
 
     // This could use array.push for slight performance improvement
-    for (let i = 0; i < this.starCount; i++) {
+    for (let i = 0; i < this.adjustedStarCount; i++) {
       const star: Star = {
         x: Math.random() * this.context.canvas.width,
         y: Math.random() * this.context.canvas.height,
@@ -230,12 +296,13 @@ export class StarParticlesComponent {
       const star2 = this.stars[j];
       const distance = this.calculateDistance(star1, star2);
 
-      if (distance < this.connectionRange) {
+      if (distance < this.adjustedStarRange) {
         this.context.beginPath();
         this.context.moveTo(star1.x, star1.y);
         const width =
-          this.connectionBaseWidth + (1 - distance / this.connectionRange) * 1;
-        const opacity = 1 - distance / this.connectionRange;
+          this.connectionBaseWidth +
+          (1 - distance / this.adjustedStarRange) * 1;
+        const opacity = 1 - distance / this.adjustedStarRange;
         this.context.lineWidth = width;
         this.context.lineTo(star1.x, star1.y);
         this.context.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
